@@ -29,3 +29,10 @@ worker:
   connect-timeout-ms: 5000
   read-timeout-ms: 10000
   webhook-signing-secret: ${WEBHOOK_SIGNING_SECRET:super-secret-hmac-key-change-in-prod}
+  max-concurrent-per-domain: 10
+
+redisson:
+  singleServerConfig:
+    address: "redis://${REDIS_HOST:127.0.0.1}:${REDIS_PORT:6379}"
+    password: ${REDIS_PASSWORD:null}
+
