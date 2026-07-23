@@ -10,6 +10,10 @@ import com.orchestrator.coordinator.repository.TaskScheduleRepository;
 import com.orchestrator.coordinator.service.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -29,11 +33,11 @@ public class DeadLetterQueueController {
     private final OutboxService outboxService;
 
     @GetMapping("/executions")
-    public List<TaskExecutionDTO> getFailedExecutions() {
-        return executionRepository.findAll().stream()
-                .filter(e -> e.getStatus() == ExecutionStatus.FAILED)
-                .map(this::toDTO)
-                .toList();
+    public Page<TaskExecutionDTO> getFailedExecutions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("startedAt").descending());
+        return executionRepository.findByStatus(ExecutionStatus.FAILED, pageable).map(this::toDTO);
     }
 
     @PostMapping("/executions/{executionId}/replay")
