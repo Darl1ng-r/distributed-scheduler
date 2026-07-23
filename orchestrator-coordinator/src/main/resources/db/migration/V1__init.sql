@@ -26,7 +26,19 @@ CREATE TABLE IF NOT EXISTS task_executions (
     response_status INT
 );
 
+CREATE TABLE IF NOT EXISTS outbox_messages (
+    id VARCHAR(255) PRIMARY KEY,
+    aggregate_type VARCHAR(100) NOT NULL,
+    aggregate_id VARCHAR(255) NOT NULL,
+    payload TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_task_schedules_status ON task_schedules(status);
 CREATE INDEX IF NOT EXISTS idx_task_executions_schedule_id_started ON task_executions(task_schedule_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_task_executions_status ON task_executions(status);
+CREATE INDEX IF NOT EXISTS idx_outbox_status_created ON outbox_messages(status, created_at ASC);
+

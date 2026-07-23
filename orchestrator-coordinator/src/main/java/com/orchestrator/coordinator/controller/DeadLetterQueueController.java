@@ -7,10 +7,9 @@ import com.orchestrator.coordinator.entity.TaskExecutionEntity;
 import com.orchestrator.coordinator.entity.TaskScheduleEntity;
 import com.orchestrator.coordinator.repository.TaskExecutionRepository;
 import com.orchestrator.coordinator.repository.TaskScheduleRepository;
-import com.orchestrator.coordinator.service.TaskPublisherService;
+import com.orchestrator.coordinator.service.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +26,7 @@ public class DeadLetterQueueController {
 
     private final TaskExecutionRepository executionRepository;
     private final TaskScheduleRepository scheduleRepository;
-    private final TaskPublisherService publisherService;
+    private final OutboxService outboxService;
 
     @GetMapping("/executions")
     public List<TaskExecutionDTO> getFailedExecutions() {
@@ -72,8 +71,8 @@ public class DeadLetterQueueController {
                 .initialIntervalSec(schedule.getInitialIntervalSec())
                 .build();
 
-        publisherService.publishTask(payload);
-        log.info("Replayed failed execution ID {} for schedule ID {}", executionId, schedule.getId());
+        outboxService.enqueueTaskExecution(execution.getId(), payload);
+        log.info("Replayed failed execution ID {} for schedule ID {} via outbox", executionId, schedule.getId());
 
         return ResponseEntity.ok(Map.of(
                 "message", "Execution replayed successfully",

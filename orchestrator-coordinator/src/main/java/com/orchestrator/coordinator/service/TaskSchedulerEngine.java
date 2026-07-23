@@ -27,7 +27,7 @@ public class TaskSchedulerEngine {
     private final LeaderElectionService leaderElectionService;
     private final TaskScheduleRepository scheduleRepository;
     private final TaskExecutionRepository executionRepository;
-    private final TaskPublisherService publisherService;
+    private final OutboxService outboxService;
     private final RedisScheduleIndexService redisIndexService;
 
     @Scheduled(fixedDelayString = "${scheduler.poll-interval-ms:5000}")
@@ -106,8 +106,8 @@ public class TaskSchedulerEngine {
                 .initialIntervalSec(schedule.getInitialIntervalSec())
                 .build();
 
-        publisherService.publishTask(payload);
-        log.info("Triggered task '{}' [Schedule ID: {}, Execution ID: {}]", schedule.getName(), schedule.getId(), executionId);
+        outboxService.enqueueTaskExecution(executionId, payload);
+        log.info("Triggered task '{}' [Schedule ID: {}, Execution ID: {}] enqueued to outbox", schedule.getName(), schedule.getId(), executionId);
     }
 
     @Transactional
@@ -141,8 +141,8 @@ public class TaskSchedulerEngine {
                 .initialIntervalSec(schedule.getInitialIntervalSec())
                 .build();
 
-        publisherService.publishTask(payload);
-        log.info("Manual ad-hoc trigger for task '{}' [Schedule ID: {}, Execution ID: {}]", schedule.getName(), schedule.getId(), executionId);
+        outboxService.enqueueTaskExecution(executionId, payload);
+        log.info("Manual ad-hoc trigger for task '{}' [Schedule ID: {}, Execution ID: {}] enqueued to outbox", schedule.getName(), schedule.getId(), executionId);
         return executionId;
     }
 }
