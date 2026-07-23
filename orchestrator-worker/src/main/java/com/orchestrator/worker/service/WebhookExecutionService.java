@@ -2,6 +2,7 @@ package com.orchestrator.worker.service;
 
 import com.orchestrator.common.dto.TaskMessagePayload;
 import com.orchestrator.common.util.HmacSigner;
+import com.orchestrator.common.util.UrlSecurityValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -35,6 +36,10 @@ public class WebhookExecutionService {
     }
 
     public int executeWebhook(TaskMessagePayload payload) {
+        if (!UrlSecurityValidator.isValidWebhookUrl(payload.getWebhookUrl())) {
+            throw new IllegalArgumentException("Security violation: Webhook URL '" + payload.getWebhookUrl() + "' failed SSRF validation");
+        }
+
         boolean acquired = false;
         try {
             acquired = rateLimiterService.tryAcquire(payload.getWebhookUrl(), 30000);

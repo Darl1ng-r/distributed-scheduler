@@ -1,6 +1,7 @@
 package com.orchestrator.common.dto;
 
 import com.orchestrator.common.enums.TaskStatus;
+import com.orchestrator.common.validation.ValidWebhookUrl;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class TaskScheduleDTO {
     private String cronExpression;
 
     @NotBlank(message = "Webhook URL is required")
+    @ValidWebhookUrl
     private String webhookUrl;
 
     private Map<String, String> headers;
