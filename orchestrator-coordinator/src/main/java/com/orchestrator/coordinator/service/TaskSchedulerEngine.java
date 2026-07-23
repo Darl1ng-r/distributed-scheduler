@@ -30,9 +30,6 @@ public class TaskSchedulerEngine {
     private final TaskPublisherService publisherService;
     private final RedisScheduleIndexService redisIndexService;
 
-    @Value("${scheduler.webhook-signing-secret:super-secret-hmac-key}")
-    private String signingSecret;
-
     @Scheduled(fixedDelayString = "${scheduler.poll-interval-ms:5000}")
     @Transactional
     public void pollAndScheduleTasks() {
@@ -107,7 +104,6 @@ public class TaskSchedulerEngine {
                 .maxRetries(schedule.getMaxRetries())
                 .backoffMultiplier(schedule.getBackoffMultiplier())
                 .initialIntervalSec(schedule.getInitialIntervalSec())
-                .secretKey(signingSecret)
                 .build();
 
         publisherService.publishTask(payload);
@@ -143,7 +139,6 @@ public class TaskSchedulerEngine {
                 .maxRetries(schedule.getMaxRetries())
                 .backoffMultiplier(schedule.getBackoffMultiplier())
                 .initialIntervalSec(schedule.getInitialIntervalSec())
-                .secretKey(signingSecret)
                 .build();
 
         publisherService.publishTask(payload);

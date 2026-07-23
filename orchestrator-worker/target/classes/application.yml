@@ -28,3 +28,4 @@ spring:
 worker:
   connect-timeout-ms: 5000
   read-timeout-ms: 10000
+  webhook-signing-secret: ${WEBHOOK_SIGNING_SECRET:super-secret-hmac-key-change-in-prod}

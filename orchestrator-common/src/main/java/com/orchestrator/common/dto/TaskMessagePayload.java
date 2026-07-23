@@ -22,5 +22,4 @@ public class TaskMessagePayload implements Serializable {
     private int maxRetries;
     private double backoffMultiplier;
     private int initialIntervalSec;
-    private String secretKey; // Key used for HMAC webhook signing
 }

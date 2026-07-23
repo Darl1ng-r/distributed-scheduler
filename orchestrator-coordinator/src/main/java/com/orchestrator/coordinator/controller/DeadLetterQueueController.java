@@ -29,9 +29,6 @@ public class DeadLetterQueueController {
     private final TaskScheduleRepository scheduleRepository;
     private final TaskPublisherService publisherService;
 
-    @Value("${scheduler.webhook-signing-secret:super-secret-hmac-key}")
-    private String signingSecret;
-
     @GetMapping("/executions")
     public List<TaskExecutionDTO> getFailedExecutions() {
         return executionRepository.findAll().stream()
@@ -73,7 +70,6 @@ public class DeadLetterQueueController {
                 .maxRetries(schedule.getMaxRetries())
                 .backoffMultiplier(schedule.getBackoffMultiplier())
                 .initialIntervalSec(schedule.getInitialIntervalSec())
-                .secretKey(signingSecret)
                 .build();
 
         publisherService.publishTask(payload);

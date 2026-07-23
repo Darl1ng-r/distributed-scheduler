@@ -18,9 +18,11 @@ public class WebhookExecutionService {
 
     private final RestClient restClient;
     private final DomainRateLimiterService rateLimiterService;
+    private final String signingSecret;
 
     public WebhookExecutionService(@Value("${worker.connect-timeout-ms:5000}") int connectTimeout,
                                    @Value("${worker.read-timeout-ms:10000}") int readTimeout,
+                                   @Value("${worker.webhook-signing-secret:super-secret-hmac-key-change-in-prod}") String signingSecret,
                                    DomainRateLimiterService rateLimiterService) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(connectTimeout);
@@ -29,6 +31,7 @@ public class WebhookExecutionService {
                 .requestFactory(requestFactory)
                 .build();
         this.rateLimiterService = rateLimiterService;
+        this.signingSecret = signingSecret;
     }
 
     public int executeWebhook(TaskMessagePayload payload) {
@@ -41,7 +44,7 @@ public class WebhookExecutionService {
 
             String timestamp = OffsetDateTime.now().toString();
             String signaturePayload = payload.getExecutionId() + ":" + timestamp + ":" + payload.getTaskScheduleId();
-            String signature = HmacSigner.calculateSignature(signaturePayload, payload.getSecretKey());
+            String signature = HmacSigner.calculateSignature(signaturePayload, signingSecret);
 
             log.info("Executing webhook POST to '{}' for execution ID {}", payload.getWebhookUrl(), payload.getExecutionId());
 
