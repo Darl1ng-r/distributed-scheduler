@@ -9,16 +9,16 @@ spring:
       enabled: true
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/scheduler
-    username: user
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:scheduler}
+    username: ${DB_USER:user}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
     listener:
       simple:
         concurrency: 5
