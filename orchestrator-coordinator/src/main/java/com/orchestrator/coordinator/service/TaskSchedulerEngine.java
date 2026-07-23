@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,18 +44,19 @@ public class TaskSchedulerEngine {
 
         log.debug("Leader active. Polling active schedules...");
         List<TaskScheduleEntity> activeSchedules = scheduleRepository.findByStatus(TaskStatus.ACTIVE);
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         for (TaskScheduleEntity schedule : activeSchedules) {
             try {
                 if (shouldRun(schedule, now)) {
                     triggerTask(schedule, now);
                 } else if (CronExpression.isValidExpression(schedule.getCronExpression())) {
+                    ZoneId zone = getZoneId(schedule.getTimezone());
                     CronExpression cron = CronExpression.parse(schedule.getCronExpression());
-                    OffsetDateTime lastRun = schedule.getLastRunAt() != null ? schedule.getLastRunAt() : now;
-                    OffsetDateTime nextRun = cron.next(lastRun);
-                    if (nextRun != null) {
-                        redisIndexService.indexSchedule(schedule.getId(), nextRun);
+                    ZonedDateTime lastRunZdt = (schedule.getLastRunAt() != null ? schedule.getLastRunAt() : now).atZoneSameInstant(zone);
+                    ZonedDateTime nextRunZdt = cron.next(lastRunZdt);
+                    if (nextRunZdt != null) {
+                        redisIndexService.indexSchedule(schedule.getId(), nextRunZdt.toOffsetDateTime());
                     }
                 }
             } catch (Exception e) {
@@ -61,21 +65,38 @@ public class TaskSchedulerEngine {
         }
     }
 
-    private boolean shouldRun(TaskScheduleEntity schedule, OffsetDateTime now) {
+    private boolean shouldRun(TaskScheduleEntity schedule, OffsetDateTime nowUtc) {
         if (!CronExpression.isValidExpression(schedule.getCronExpression())) {
             log.warn("Invalid cron expression '{}' for schedule ID {}", schedule.getCronExpression(), schedule.getId());
             return false;
         }
 
+        ZoneId zone = getZoneId(schedule.getTimezone());
         CronExpression cron = CronExpression.parse(schedule.getCronExpression());
+
+        ZonedDateTime nowInZone = nowUtc.atZoneSameInstant(zone);
         OffsetDateTime lastRun = schedule.getLastRunAt();
 
         if (lastRun == null) {
             return true;
         }
 
-        OffsetDateTime nextExpectedRun = cron.next(lastRun);
-        return nextExpectedRun != null && !nextExpectedRun.isAfter(now);
+        ZonedDateTime lastRunInZone = lastRun.atZoneSameInstant(zone);
+        ZonedDateTime nextExpectedRun = cron.next(lastRunInZone);
+
+        return nextExpectedRun != null && !nextExpectedRun.isAfter(nowInZone);
+    }
+
+    private ZoneId getZoneId(String timezoneStr) {
+        if (timezoneStr == null || timezoneStr.isBlank()) {
+            return ZoneOffset.UTC;
+        }
+        try {
+            return ZoneId.of(timezoneStr);
+        } catch (Exception e) {
+            log.warn("Invalid zone ID '{}', falling back to UTC", timezoneStr);
+            return ZoneOffset.UTC;
+        }
     }
 
     private void triggerTask(TaskScheduleEntity schedule, OffsetDateTime now) {

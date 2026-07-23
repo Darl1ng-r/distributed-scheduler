@@ -66,6 +66,7 @@ public class TaskScheduleController {
                     if (dto.getMaxRetries() != null) existing.setMaxRetries(dto.getMaxRetries());
                     if (dto.getBackoffMultiplier() != null) existing.setBackoffMultiplier(dto.getBackoffMultiplier());
                     if (dto.getInitialIntervalSec() != null) existing.setInitialIntervalSec(dto.getInitialIntervalSec());
+                    if (dto.getTimezone() != null) existing.setTimezone(dto.getTimezone());
                     if (dto.getStatus() != null) existing.setStatus(dto.getStatus());
                     TaskScheduleEntity updated = scheduleRepository.save(existing);
                     return ResponseEntity.ok(toDTO(updated));
@@ -116,6 +117,7 @@ public class TaskScheduleController {
                 .maxRetries(entity.getMaxRetries())
                 .backoffMultiplier(entity.getBackoffMultiplier())
                 .initialIntervalSec(entity.getInitialIntervalSec())
+                .timezone(entity.getTimezone())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -132,6 +134,7 @@ public class TaskScheduleController {
                 .maxRetries(dto.getMaxRetries())
                 .backoffMultiplier(dto.getBackoffMultiplier())
                 .initialIntervalSec(dto.getInitialIntervalSec())
+                .timezone(dto.getTimezone() != null ? dto.getTimezone() : "UTC")
                 .status(dto.getStatus() != null ? dto.getStatus() : TaskStatus.ACTIVE)
                 .build();
     }

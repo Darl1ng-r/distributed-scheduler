@@ -33,6 +33,7 @@ public class TaskScheduleDTO {
     private Integer maxRetries;
     private Double backoffMultiplier;
     private Integer initialIntervalSec;
+    private String timezone;
 
     private TaskStatus status;
     private OffsetDateTime createdAt;

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS task_schedules (
     max_retries INT DEFAULT 3,
     backoff_multiplier DOUBLE PRECISION DEFAULT 2.0,
     initial_interval_sec INT DEFAULT 5,
+    timezone VARCHAR(50) DEFAULT 'UTC',
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
     last_run_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,

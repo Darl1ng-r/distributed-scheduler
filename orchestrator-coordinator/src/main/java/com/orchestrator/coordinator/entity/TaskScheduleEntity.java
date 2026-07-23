@@ -43,6 +43,9 @@ public class TaskScheduleEntity {
     @Column(name = "initial_interval_sec")
     private Integer initialIntervalSec;
 
+    @Column(name = "timezone")
+    private String timezone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TaskStatus status;
@@ -64,6 +67,7 @@ public class TaskScheduleEntity {
         if (backoffMultiplier == null) backoffMultiplier = 2.0;
         if (initialIntervalSec == null) initialIntervalSec = 5;
         if (status == null) status = TaskStatus.ACTIVE;
+        if (timezone == null || timezone.isBlank()) timezone = "UTC";
     }
 
     @PreUpdate

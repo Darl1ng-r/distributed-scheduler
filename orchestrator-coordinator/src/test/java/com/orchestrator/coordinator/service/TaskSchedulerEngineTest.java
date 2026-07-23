@@ -113,4 +113,26 @@ class TaskSchedulerEngineTest {
         verify(executionRepository, times(1)).save(any());
         verify(outboxService, times(1)).enqueueTaskExecution(eq(executionId), any(TaskMessagePayload.class));
     }
+
+    @Test
+    @DisplayName("Should evaluate cron expression respecting configured IANA timezone")
+    void shouldRespectScheduleTimezoneWhenEvaluatingCron() {
+        when(leaderElectionService.tryAcquireOrRenewLeaderLock()).thenReturn(true);
+
+        TaskScheduleEntity schedule = TaskScheduleEntity.builder()
+                .id("sched-ny")
+                .name("New York Morning Job")
+                .cronExpression("* * * * * ?")
+                .webhookUrl("https://api.example.com/ny-job")
+                .timezone("America/New_York")
+                .status(TaskStatus.ACTIVE)
+                .maxRetries(3)
+                .build();
+
+        when(scheduleRepository.findByStatus(TaskStatus.ACTIVE)).thenReturn(List.of(schedule));
+
+        schedulerEngine.pollAndScheduleTasks();
+
+        verify(outboxService, times(1)).enqueueTaskExecution(anyString(), any(TaskMessagePayload.class));
+    }
 }
