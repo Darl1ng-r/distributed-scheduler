@@ -44,7 +44,7 @@ class TaskResultHandlerTest {
         resultHandler.handleSuccess(payload, 200);
 
         verify(jdbcTemplate, times(1)).update(
-                anyString(),
+                any(String.class),
                 eq(ExecutionStatus.SUCCESS.name()),
                 eq(200),
                 any(),
@@ -69,7 +69,7 @@ class TaskResultHandlerTest {
         resultHandler.handleFailure(payload, cause, 504);
 
         verify(jdbcTemplate, times(1)).update(
-                anyString(),
+                any(String.class),
                 eq(ExecutionStatus.RETRYING.name()),
                 eq("504 Gateway Timeout"),
                 eq(504),
@@ -99,7 +99,7 @@ class TaskResultHandlerTest {
         resultHandler.handleFailure(payload, cause, 404);
 
         verify(jdbcTemplate, times(1)).update(
-                anyString(),
+                any(String.class),
                 eq(ExecutionStatus.FAILED.name()),
                 eq("404 Not Found"),
                 eq(404),

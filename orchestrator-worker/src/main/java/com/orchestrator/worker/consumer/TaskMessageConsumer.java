@@ -35,9 +35,21 @@ public class TaskMessageConsumer {
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("Failed executing task for execution ID {}: {}", payload.getExecutionId(), e.getMessage());
-            resultHandler.handleFailure(payload, e, null);
+            Integer statusCode = extractStatusCode(e);
+            resultHandler.handleFailure(payload, e, statusCode);
             // Ack message from current queue since retry payload (with updated attempt/expiration) has been re-enqueued to retry queue
             channel.basicAck(deliveryTag, false);
         }
+    }
+
+    private Integer extractStatusCode(Throwable e) {
+        Throwable current = e;
+        while (current != null) {
+            if (current instanceof org.springframework.web.client.RestClientResponseException rre) {
+                return rre.getStatusCode().value();
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 }

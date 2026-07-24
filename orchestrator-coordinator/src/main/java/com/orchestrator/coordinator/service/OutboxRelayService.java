@@ -43,16 +43,23 @@ public class OutboxRelayService {
 
         for (OutboxMessageEntity message : pendingMessages) {
             try {
-                TaskMessagePayload payload = objectMapper.readValue(message.getPayload(), TaskMessagePayload.class);
+                TaskMessagePayload payload;
+                try {
+                    payload = objectMapper.readValue(message.getPayload(), TaskMessagePayload.class);
+                } catch (Exception parseEx) {
+                    log.error("Unrecoverable payload JSON parse error for outbox message [ID: {}]: {}", message.getId(), parseEx.getMessage());
+                    message.setStatus(OutboxStatus.FAILED);
+                    outboxRepository.save(message);
+                    continue;
+                }
+
                 publisherService.publishTask(payload);
                 message.setStatus(OutboxStatus.PUBLISHED);
                 message.setProcessedAt(OffsetDateTime.now());
                 outboxRepository.save(message);
                 log.info("Outbox message [ID: {}] for aggregate ID {} successfully published to RabbitMQ", message.getId(), message.getAggregateId());
             } catch (Exception e) {
-                log.error("Failed to process outbox message [ID: {}]: {}", message.getId(), e.getMessage(), e);
-                message.setStatus(OutboxStatus.FAILED);
-                outboxRepository.save(message);
+                log.warn("Transient failure publishing outbox message [ID: {}] to RabbitMQ (will retry on next tick): {}", message.getId(), e.getMessage());
             }
         }
     }

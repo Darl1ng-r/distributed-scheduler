@@ -71,6 +71,9 @@ public class WebhookExecutionService {
 
             log.info("Webhook POST to '{}' responded with HTTP {}", payload.getWebhookUrl(), response.getStatusCode().value());
             return response.getStatusCode().value();
+        } catch (org.springframework.web.client.RestClientResponseException rre) {
+            log.warn("Webhook POST to '{}' for execution ID {} failed with HTTP {}", payload.getWebhookUrl(), payload.getExecutionId(), rre.getStatusCode().value());
+            throw rre;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Thread interrupted while acquiring domain rate limit permit", e);

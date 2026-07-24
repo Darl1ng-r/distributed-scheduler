@@ -1,14 +1,15 @@
 package com.orchestrator.coordinator.service;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
+import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -17,67 +18,70 @@ public class LeaderElectionService {
 
     private final RedissonClient redissonClient;
     private final String lockKey;
+    private final long leaseTimeSec;
+    private final String nodeId = UUID.randomUUID().toString();
     private final AtomicBoolean isLeader = new AtomicBoolean(false);
-    private RLock leaderLock;
 
     public LeaderElectionService(RedissonClient redissonClient,
-                                 @Value("${scheduler.leader-lock-key:scheduler:leader:lock}") String lockKey) {
+                                 @Value("${scheduler.leader-lock-key:scheduler:leader:lock}") String lockKey,
+                                 @Value("${scheduler.leader-lock-lease-sec:15}") long leaseTimeSec) {
         this.redissonClient = redissonClient;
         this.lockKey = lockKey;
+        this.leaseTimeSec = leaseTimeSec;
     }
 
-    @PostConstruct
-    public void init() {
-        this.leaderLock = redissonClient.getLock(lockKey);
-    }
-
-    public boolean tryAcquireOrRenewLeaderLock() {
+    public synchronized boolean tryAcquireOrRenewLeaderLock() {
         try {
-            if (leaderLock.isHeldByCurrentThread()) {
+            RBucket<String> bucket = redissonClient.getBucket(lockKey);
+            String currentLeader = bucket.get();
+
+            if (currentLeader == null) {
+                boolean acquired = bucket.setIfAbsent(nodeId, Duration.ofSeconds(leaseTimeSec));
+                if (acquired) {
+                    if (!isLeader.get()) {
+                        log.info("Leader election SUCCESS: Node {} acquired leader lock key '{}'", nodeId, lockKey);
+                        isLeader.set(true);
+                    }
+                    return true;
+                }
+            } else if (nodeId.equals(currentLeader)) {
+                bucket.expire(Duration.ofSeconds(leaseTimeSec));
                 if (!isLeader.get()) {
+                    log.info("Leader election RENEWED: Node {} renewed leader lock key '{}'", nodeId, lockKey);
                     isLeader.set(true);
                 }
                 return true;
             }
 
-            // Using leaseTime = -1 enables Redisson Watchdog auto-renewal mechanism
-            boolean acquired = leaderLock.tryLock(0, -1, TimeUnit.SECONDS);
-            if (acquired) {
-                if (!isLeader.get()) {
-                    log.info("Leader election SUCCESS: Node acquired leader lock key '{}' with Watchdog auto-renewal", lockKey);
-                    isLeader.set(true);
-                }
-                return true;
-            } else {
-                if (isLeader.get()) {
-                    log.warn("Leader election LOST: Node lost leader lock key '{}'", lockKey);
-                    isLeader.set(false);
-                }
-                return false;
+            if (isLeader.get()) {
+                log.warn("Leader election LOST: Node {} lost leader lock key '{}'", nodeId, lockKey);
+                isLeader.set(false);
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            isLeader.set(false);
             return false;
         } catch (Exception e) {
-            log.error("Error during Redisson leader lock acquisition: {}", e.getMessage());
+            log.error("Error during leader lock acquisition for node {}: {}", nodeId, e.getMessage());
             isLeader.set(false);
             return false;
         }
     }
 
     public boolean isCurrentLeader() {
-        return isLeader.get() && leaderLock != null && leaderLock.isHeldByCurrentThread();
+        return isLeader.get();
     }
 
     @PreDestroy
-    public void releaseLeadership() {
-        if (leaderLock != null && leaderLock.isHeldByCurrentThread()) {
-            log.info("Node shutting down: Releasing leader lock key '{}'", lockKey);
+    public synchronized void releaseLeadership() {
+        if (isLeader.get()) {
+            log.info("Node shutting down: Releasing leader lock key '{}' for node {}", lockKey, nodeId);
             try {
-                leaderLock.unlock();
+                RBucket<String> bucket = redissonClient.getBucket(lockKey);
+                if (nodeId.equals(bucket.get())) {
+                    bucket.delete();
+                }
             } catch (Exception e) {
                 log.warn("Error releasing leader lock on shutdown: {}", e.getMessage());
+            } finally {
+                isLeader.set(false);
             }
         }
     }

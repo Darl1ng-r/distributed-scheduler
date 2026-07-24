@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -32,6 +33,8 @@ public class TaskSchedulerEngine {
     private final TaskExecutionRepository executionRepository;
     private final OutboxService outboxService;
     private final RedisScheduleIndexService redisIndexService;
+
+    private final ConcurrentHashMap<String, CronExpression> cronCache = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${scheduler.poll-interval-ms:5000}")
     @Transactional
@@ -48,11 +51,16 @@ public class TaskSchedulerEngine {
 
         for (TaskScheduleEntity schedule : activeSchedules) {
             try {
-                if (shouldRun(schedule, now)) {
+                CronExpression cron = parseCronExpression(schedule.getCronExpression());
+                if (cron == null) {
+                    log.warn("Invalid cron expression '{}' for schedule ID {}", schedule.getCronExpression(), schedule.getId());
+                    continue;
+                }
+
+                if (shouldRun(schedule, cron, now)) {
                     triggerTask(schedule, now);
-                } else if (CronExpression.isValidExpression(schedule.getCronExpression())) {
+                } else {
                     ZoneId zone = getZoneId(schedule.getTimezone());
-                    CronExpression cron = CronExpression.parse(schedule.getCronExpression());
                     ZonedDateTime lastRunZdt = (schedule.getLastRunAt() != null ? schedule.getLastRunAt() : now).atZoneSameInstant(zone);
                     ZonedDateTime nextRunZdt = cron.next(lastRunZdt);
                     if (nextRunZdt != null) {
@@ -65,15 +73,8 @@ public class TaskSchedulerEngine {
         }
     }
 
-    private boolean shouldRun(TaskScheduleEntity schedule, OffsetDateTime nowUtc) {
-        if (!CronExpression.isValidExpression(schedule.getCronExpression())) {
-            log.warn("Invalid cron expression '{}' for schedule ID {}", schedule.getCronExpression(), schedule.getId());
-            return false;
-        }
-
+    private boolean shouldRun(TaskScheduleEntity schedule, CronExpression cron, OffsetDateTime nowUtc) {
         ZoneId zone = getZoneId(schedule.getTimezone());
-        CronExpression cron = CronExpression.parse(schedule.getCronExpression());
-
         ZonedDateTime nowInZone = nowUtc.atZoneSameInstant(zone);
         OffsetDateTime lastRun = schedule.getLastRunAt();
 
@@ -85,6 +86,19 @@ public class TaskSchedulerEngine {
         ZonedDateTime nextExpectedRun = cron.next(lastRunInZone);
 
         return nextExpectedRun != null && !nextExpectedRun.isAfter(nowInZone);
+    }
+
+    private CronExpression parseCronExpression(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return null;
+        }
+        return cronCache.computeIfAbsent(expression, expr -> {
+            try {
+                return CronExpression.parse(expr);
+            } catch (Exception e) {
+                return null;
+            }
+        });
     }
 
     private ZoneId getZoneId(String timezoneStr) {
@@ -135,7 +149,7 @@ public class TaskSchedulerEngine {
     public String triggerTaskNow(String scheduleId) {
         TaskScheduleEntity schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new IllegalArgumentException("Schedule not found with ID: " + scheduleId));
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         String executionId = UUID.randomUUID().toString();
 
         TaskExecutionEntity execution = TaskExecutionEntity.builder()

@@ -26,6 +26,7 @@ public class TaskScheduleController {
 
     private final TaskScheduleRepository scheduleRepository;
     private final TaskSchedulerEngine schedulerEngine;
+    private final com.orchestrator.coordinator.service.RedisScheduleIndexService redisIndexService;
 
     @GetMapping
     public Page<TaskScheduleDTO> getAllSchedules(
@@ -47,6 +48,9 @@ public class TaskScheduleController {
 
     @PostMapping
     public ResponseEntity<TaskScheduleDTO> createSchedule(@Valid @RequestBody TaskScheduleDTO dto) {
+        if (!org.springframework.scheduling.support.CronExpression.isValidExpression(dto.getCronExpression())) {
+            throw new IllegalArgumentException("Invalid cron expression: " + dto.getCronExpression());
+        }
         TaskScheduleEntity entity = toEntity(dto);
         if (entity.getId() == null) {
             entity.setId(UUID.randomUUID().toString());
@@ -57,6 +61,9 @@ public class TaskScheduleController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TaskScheduleDTO> updateSchedule(@PathVariable String id, @Valid @RequestBody TaskScheduleDTO dto) {
+        if (dto.getCronExpression() != null && !org.springframework.scheduling.support.CronExpression.isValidExpression(dto.getCronExpression())) {
+            throw new IllegalArgumentException("Invalid cron expression: " + dto.getCronExpression());
+        }
         return scheduleRepository.findById(id)
                 .map(existing -> {
                     existing.setName(dto.getName());
@@ -91,6 +98,7 @@ public class TaskScheduleController {
             return ResponseEntity.notFound().build();
         }
         scheduleRepository.deleteById(id);
+        redisIndexService.removeSchedule(id);
         return ResponseEntity.noContent().build();
     }
 
