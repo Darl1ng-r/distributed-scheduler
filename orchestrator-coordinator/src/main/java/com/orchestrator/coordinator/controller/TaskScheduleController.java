@@ -4,6 +4,7 @@ import com.orchestrator.common.dto.TaskScheduleDTO;
 import com.orchestrator.common.enums.TaskStatus;
 import com.orchestrator.coordinator.entity.TaskScheduleEntity;
 import com.orchestrator.coordinator.repository.TaskScheduleRepository;
+import com.orchestrator.coordinator.service.RedisScheduleIndexService;
 import com.orchestrator.coordinator.service.TaskSchedulerEngine;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +14,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,7 +27,7 @@ public class TaskScheduleController {
 
     private final TaskScheduleRepository scheduleRepository;
     private final TaskSchedulerEngine schedulerEngine;
-    private final com.orchestrator.coordinator.service.RedisScheduleIndexService redisIndexService;
+    private final RedisScheduleIndexService redisIndexService;
 
     @GetMapping
     public Page<TaskScheduleDTO> getAllSchedules(
@@ -48,7 +49,7 @@ public class TaskScheduleController {
 
     @PostMapping
     public ResponseEntity<TaskScheduleDTO> createSchedule(@Valid @RequestBody TaskScheduleDTO dto) {
-        if (!org.springframework.scheduling.support.CronExpression.isValidExpression(dto.getCronExpression())) {
+        if (!CronExpression.isValidExpression(dto.getCronExpression())) {
             throw new IllegalArgumentException("Invalid cron expression: " + dto.getCronExpression());
         }
         TaskScheduleEntity entity = toEntity(dto);
@@ -61,7 +62,7 @@ public class TaskScheduleController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TaskScheduleDTO> updateSchedule(@PathVariable String id, @Valid @RequestBody TaskScheduleDTO dto) {
-        if (dto.getCronExpression() != null && !org.springframework.scheduling.support.CronExpression.isValidExpression(dto.getCronExpression())) {
+        if (dto.getCronExpression() != null && !CronExpression.isValidExpression(dto.getCronExpression())) {
             throw new IllegalArgumentException("Invalid cron expression: " + dto.getCronExpression());
         }
         return scheduleRepository.findById(id)
